@@ -8,6 +8,7 @@ def explain(event,applicationLogs,nSols,rootCause):
     # load knowledge base
     reasoner.consult("explainer/prolog/severity.pl")
     reasoner.consult("explainer/prolog/explain.pl")
+    reasoner.consult("explainer/prolog/meta_interprete.pl")
     reasoner.consult(applicationLogs)
     
     # read event to explain
