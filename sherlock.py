@@ -82,7 +82,7 @@ def explanations(solutionsList):
                 timestamp = datetime.fromtimestamp(event.args[2]) # timestamp saved as ISO
             message = str(event.args[4])
             ppAbd.append(Event(serviceName,type,instance,timestamp,message, eventType))
-        sol.abduction = ppAbd
+        sol.abductions = ppAbd
         solutions.append(sol)    
     return solutions
     
@@ -128,7 +128,7 @@ def main(argv):
 
     event = args[0]
     knowledgeBase = args[1]
-    nAbducibles = argv[2]
+    nAbducibles = args[2]
     
     # ***********************
     # * ROOT CAUSE ANALYSIS *
@@ -138,13 +138,15 @@ def main(argv):
     # *****************
     # * PRINT RESULTS *
     # *****************
-
+    solutions.sort()
+    i = 0
     for s in solutions:
     #        s.print()
+        i+=1
         if verbose:
-            s.print()
+            s.print(i)
         else:
-            s.compactPrint()
+            s.compactPrint(i)
     #solutions.marshal(templater,"explanations.txt")
 
     if len(solutions)==0:
