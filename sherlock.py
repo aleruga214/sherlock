@@ -3,6 +3,7 @@ import os,sys,getopt
 
 from pyswip import Prolog
 from pyswip import Variable
+from pyswip import Atom
 from solutions import *
 from datetime import datetime
 
@@ -25,67 +26,84 @@ def explain(event,applicationLogs, nAbducibles, nSols, rootCause):
     eventToExplain = eventToExplain[:len(eventToExplain)-2] # remove "." and "\n" at the end
 
     # run Prolog reasoner to find (and return) root causes
-    query = f"distinct(solve(causedBy({eventToExplain}, Explanations, "
-    query += (rootCause) if rootCause is not None else "Root" # use "Root" if rootCause is not specified
-    query += f"),[], D, {nAbducibles}, N, [], _))."
+    goal = f"distinct(solve(causedBy({eventToExplain}, Explanations, "
+    goal += (rootCause) if rootCause is not None else "Root" # use "Root" if rootCause is not specified
+    goal += f"),[], D, {nAbducibles}, N, [], _))"
+
+    if nSols is not None:
+        query = f"limit({nSols}, {goal})."
+    else:
+        query = f"{goal}."    
 
     rootCauses = list(reasoner.query(query))
-    return explanations(rootCauses)
+    return parseSolutions(rootCauses)
 
-def explanations(solutionsList):
+
+def parseSolutions(solutionsList):
     solutions = []
     
     for solution in solutionsList:
-        sol = Solutions([],[])
+        sol = Solution([],[])
         ppExp = [] # post-processed explanation
         ppAbd = []
          
         explanation = solution["Explanations"]
-        abduction = solution["D"]
+        abductions = solution["D"]
 
-        for event in explanation:
-            # post-processed event info
-            serviceName = str(event.args[0])
-            type = None
-            instance = None
-            timestamp = None
-            message = None 
-
-            eventType = str(event.name)
-            # case: event = "log(serviceName,instanceId,timestamp,_,_)"
-            if eventType == EventType.LOG.value:
-                type = str(event.args[3])
-                instance = str(event.args[1])
-                t_val = event.args[2]
-                if not isinstance(t_val, Variable):
-                    timestamp = datetime.fromtimestamp(event.args[2]) # timestamp saved as ISO
-                message = str(event.args[4])
-            elif not(eventType == EventType.UNREACHABLE.value or eventType == EventType.NEVER_STARTED.value) :
-                raise TypeError("unknown event type " + eventType) # to avoid missing events (if not corresponding to a known type)
-            ppExp.append(Event(serviceName,type,instance,timestamp,message,eventType))
-        
+        ppExp = parseEvents(explanation)
         sol.explanation = ppExp
 
-        for event in abduction:
-            # post-processed event info
-            serviceName = str(event.args[0])
-            type = None
-            instance = None
-            timestamp = None
-            message = None 
-            eventType = str(event.name)
-            # event = "log(serviceName,instanceId,timestamp,_,_)"
-            type = str(event.args[3])
+        ppAbd = parseEvents(abductions)
+        sol.abductions = ppAbd
+
+        solutions.append(sol)    
+    return solutions
+
+
+def parseEvents(list):
+    ppList = []
+    for event in list:
+        # post-processed event info
+        serviceName = str(event.args[0])
+        operation = None
+        instance = None
+        timestamp = None
+        message = None 
+        type = str(event.name)
+        # case: event = "log(serviceName,instanceId,timestamp,_,_)"
+        if type == EventType.LOG.value:
+            if isinstance(event.args[3],Atom):
+                operation = LogOperation.atom(event.args[3])
+            else:
+                operation = LogOperation.functor(event.args[3])    
             instance = str(event.args[1])
             t_val = event.args[2]
             if not isinstance(t_val, Variable):
                 timestamp = datetime.fromtimestamp(event.args[2]) # timestamp saved as ISO
             message = str(event.args[4])
-            ppAbd.append(Event(serviceName,type,instance,timestamp,message, eventType))
-        sol.abductions = ppAbd
-        solutions.append(sol)    
-    return solutions
-    
+        elif not(type == EventType.UNREACHABLE.value or type == EventType.NEVER_STARTED.value) :
+            raise TypeError("unknown event type " + type) # to avoid missing events (if not corresponding to a known type)
+        ppList.append(Event(serviceName,type,instance,timestamp,message,operation))
+    return ppList 
+
+
+# function for printing cli erros, followed by cli usage
+def cli_error(message):
+    print("ERROR: " + message + ".")
+    print()
+    cli_help()
+
+# function for printing cli usage
+def cli_help():
+    print("Usage of sherlock.py is as follows:")
+    print("  sherlock.py [OPTIONS] EVENT LOGS ABDUCIBLES")
+    print("where EVENT and LOGS are JSON files, ABDUCIBLES is an integer number, and OPTIONS can be")
+    print("  [--help] to print a help on the usage of sherlock.py")
+    print("  [-n N|--num=N] to set to N the amount of possible explanations to identify")
+    print("  [-r X|--root=X] to require X to be the root cause of identified explanations")
+    print("  [-v|--verbose] to print verbose analysis results")
+    print() 
+
 
 def main(argv):
 
@@ -115,7 +133,7 @@ def main(argv):
                 cli_error("the amount of solutions to find must be a positive number")
                 exit(-2)
         # setting root causing service
-        elif option in ["-r","--rootCause"]:
+        elif option in ["-r","--root"]:
             rootCause = value
         # setting verbosity
         elif option in ["-v","--verbose"]:
@@ -139,15 +157,15 @@ def main(argv):
     # * PRINT RESULTS *
     # *****************
     solutions.sort()
-    i = 0
-    for s in solutions:
-    #        s.print()
-        i+=1
-        if verbose:
-            s.print(i)
-        else:
-            s.compactPrint(i)
-    #solutions.marshal(templater,"explanations.txt")
+
+    if verbose:
+        for i,s in enumerate(solutions):
+            s.print(i+1)
+    else:
+        groupedSolutions = groupSolutions(solutions)
+        for i,s in enumerate(groupedSolutions):
+            percentage = round(len(s)/len(solutions),3)
+            s[0].compactPrint(percentage)
 
     if len(solutions)==0:
         rc = (" from " + rootCause) if rootCause!=None else "" 
@@ -155,24 +173,7 @@ def main(argv):
     else:
         end = "s" if len(solutions) > 1 else "" # plural or singular
         print("Found a total of " + str(len(solutions)) + " possible explanation" + end)
-    
-
-# function for printing cli erros, followed by cli usage
-def cli_error(message):
-    print("ERROR: " + message + ".")
-    print()
-    cli_help()
-
-# function for printing cli usage
-def cli_help():
-    print("Usage of sherlock.py is as follows:")
-    print("  sherlock.py [OPTIONS] EVENT LOGS ABDUCIBLES")
-    print("where EVENT and LOGS are JSON files, ABDUCIBLES is an integer number, and OPTIONS can be")
-    print("  [--help] to print a help on the usage of yrca.py")
-    print("  [-n N|--num=N] to set to N the amount of possible explanations to identify")
-    print("  [-r X|--root=X] to require X to be the root cause of identified explanations")
-    print("  [-v|--verbose] to print verbose analysis results")
-    print()    
+   
 
 if __name__ == "__main__":
     main(sys.argv[1:])

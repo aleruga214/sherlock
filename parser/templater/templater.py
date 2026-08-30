@@ -107,9 +107,9 @@ class Templater:
         if severity == "INFO":
             syslogSeverity = "info"
         elif severity == "WARN":
-            syslogSeverity == "warning"
+            syslogSeverity = "warning"
         elif severity == "ERROR":
             syslogSeverity = "err"
         elif severity == "FATAL":
-            syslogSeverity == "emerg"
+            syslogSeverity = "emerg"
         return syslogSeverity
