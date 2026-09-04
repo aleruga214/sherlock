@@ -4,6 +4,7 @@ import os,sys,getopt
 from pyswip import Prolog
 from pyswip import Variable
 from pyswip import Atom
+from pyswip import Functor
 from solutions import *
 from datetime import datetime
 
@@ -17,6 +18,7 @@ def explain(event,applicationLogs, nAbducibles, nSols, rootCause):
     reasoner.consult("explainer/prolog/explain.pl")
     reasoner.consult("explainer/prolog/meta_interpreter.pl")
     reasoner.consult("explainer/prolog/abducibles.pl")
+    reasoner.consult("explainer/prolog/clp_bounds.pl")
     reasoner.consult(applicationLogs)
     
     # read event to explain
@@ -25,10 +27,13 @@ def explain(event,applicationLogs, nAbducibles, nSols, rootCause):
     eventFile.close()
     eventToExplain = eventToExplain[:len(eventToExplain)-2] # remove "." and "\n" at the end
 
+    goal = f"solve_with_bounds({eventToExplain}, [], D, {nAbducibles}, N, Explanations,"
+    goal += (rootCause) if rootCause is not None else "Root"
+    goal += ")"
     # run Prolog reasoner to find (and return) root causes
-    goal = f"distinct(solve(causedBy({eventToExplain}, Explanations, "
-    goal += (rootCause) if rootCause is not None else "Root" # use "Root" if rootCause is not specified
-    goal += f"),[], D, {nAbducibles}, N, [], _))"
+    # goal = f"distinct(solve(causedBy({eventToExplain}, Explanations, "
+    # goal += (rootCause) if rootCause is not None else "Root" # use "Root" if rootCause is not specified
+    # goal += f"),[], D, {nAbducibles}, N, [], _))"
 
     if nSols is not None:
         query = f"limit({nSols}, {goal})."
@@ -62,7 +67,17 @@ def parseSolutions(solutionsList):
 
 def parseEvents(list):
     ppList = []
-    for event in list:
+    for item in list:
+        if str(item.name) == "bounded_event":
+            event = item.args[0]
+            t_min = datetime.fromtimestamp(item.args[1]) if not isinstance(item.args[1],Atom) and not isinstance(item.args[1],Functor) else item.args[1]
+            t_max = datetime.fromtimestamp(item.args[2]) if not isinstance(item.args[2],Atom) and not isinstance(item.args[2],Functor)else item.args[2]
+
+        else:
+            event = item 
+            t_max = None
+            t_min = None
+
         # post-processed event info
         serviceName = str(event.args[0])
         operation = None
@@ -79,11 +94,11 @@ def parseEvents(list):
             instance = str(event.args[1])
             t_val = event.args[2]
             if not isinstance(t_val, Variable):
-                timestamp = datetime.fromtimestamp(event.args[2]) # timestamp saved as ISO
+                timestamp = datetime.fromtimestamp(t_val) # timestamp saved as ISO
             message = str(event.args[4])
         elif not(type == EventType.UNREACHABLE.value or type == EventType.NEVER_STARTED.value) :
             raise TypeError("unknown event type " + type) # to avoid missing events (if not corresponding to a known type)
-        ppList.append(Event(serviceName,type,instance,timestamp,message,operation))
+        ppList.append(Event(serviceName,type,instance,timestamp,message,operation, t_min, t_max))
     return ppList 
 
 
@@ -159,11 +174,11 @@ def main(argv):
     solutions.sort()
 
     if verbose:
-        for i,s in enumerate(solutions):
-            s.print(i+1)
+        for i,s in enumerate(solutions, start=1):
+            s.print(i)
     else:
         groupedSolutions = groupSolutions(solutions)
-        for i,s in enumerate(groupedSolutions):
+        for s in groupedSolutions:
             percentage = round(len(s)/len(solutions),3)
             s[0].compactPrint(percentage)
 

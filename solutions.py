@@ -10,7 +10,7 @@ class LogOperation:
     def __init__(self, typeLog, sessionId = None, dstService = None):
         self.dstService = str(dstService) if dstService is not None else None
         self.typeLog = str(typeLog) if typeLog is not None else None
-        self.sessionId = int(sessionId) if sessionId is not None else None
+        self.sessionId = str(sessionId) if sessionId is not None else None
 
     @classmethod
     def atom(cls, op):
@@ -38,13 +38,15 @@ class LogOperation:
 
 # class to represent an event
 class Event:
-    def __init__(self,serviceName,type,instance,timestamp,message, operation):
+    def __init__(self,serviceName,type,instance,timestamp,message, operation, t_min, t_max):
         self.serviceName = serviceName
         self.type = type            # log, unreacheable, never started
         self.instance = instance
         self.timestamp = timestamp
         self.message = message
         self.operation = operation  # object LogOperation
+        self.t_min = t_min
+        self.t_max = t_max 
 
 
 class Solution:
@@ -79,18 +81,19 @@ class Solution:
             print(" -> " + self.eventString(event))
         print() 
 
-        print("Abductions:")
-        j=1
-        for abduction in self.abductions:
+        line = "Abductions:" if (len(self.abductions)!=0) else "No Abductions needed!"
+        
+        print(line) 
+        for j,abduction in enumerate(self.abductions, start=1):
             print(f"{j}) {self.eventString(abduction)}")
-            j+=1
-        print()    
+        print()
+           
         print("-"*50)
 
     # function for printing a single event in an explanation (verbose, with message)
     def eventString(self,e):
         if e.type == EventType.LOG.value:
-            event = f"[{e.timestamp}] " if e.timestamp is not None else ""
+            event = f"[{e.timestamp}] " if e.timestamp is not None else f"[T ∈ [{e.t_min}, {e.t_max}]] "
             instance = e.instance if not str(e.instance).startswith("_") else ""
             event += instance + " (" + e.serviceName + "): " + str(e.operation)
             return event
