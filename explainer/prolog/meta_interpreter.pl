@@ -29,12 +29,12 @@ solve(A,D,D, N, N, H, H) :-
     \+ clause(A,_),
     member(A,D).
 
-solve(A,D,[A|Dtemp], N, NewN, H, H) :- 
+solve(A,D,[A|D], N, NewN, H, H) :- 
     N > 0,
     A \= (_,_), A \= (_;_), A \= {_}, A \= (\+_),
     \+ clause(A,_), 
     \+ member(A,D),
-    abducible(A, D, Dtemp),%!, 
+    abducible(A, D),%!, 
     NewN is N - 1.
 
 

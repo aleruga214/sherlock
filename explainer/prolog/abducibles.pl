@@ -1,8 +1,8 @@
-abducible(log(SI,_,T,internal,_,err), D, D) :- once(log(SI,_,_,_,_,_)).
+abducible(log(SI,_,_,internal,_,err), _) :- once(log(SI,_,_,_,_,_)).
 
-abducible(log(SI,_,T,received(_),_,info), D, D) :- once(log(SI,_,_,_,_,_)).
+abducible(log(SI,_,_,received(_),_,info), _) :- once(log(SI,_,_,_,_,_)).
 
-abducible(log(SI,_,T,sendTo(SJ,Id),_,info), D, D) :- 
+abducible(log(SI,_,T,sendTo(SJ,Id),_,info), _) :- 
     once(
         (log(SI,_,Te,okFrom(SJ,Id),_,info); 
         log(SI,_,Te,timeout(SJ,Id),_,err); 
@@ -11,7 +11,7 @@ abducible(log(SI,_,T,sendTo(SJ,Id),_,info), D, D) :-
     dif(SI, SJ), 
     { T>=0, T=<Te }.
 
-abducible(log(SI,_,T,sendTo(SJ,Id),_,info), D, D) :-
+abducible(log(SI,_,T,sendTo(SJ,Id),_,info), _) :-
     once(
         (log(SI,_,_,sendTo(SJ,Id2),_,info), 
         log(SJ,_, Te,received(Id),_,info))
@@ -21,18 +21,18 @@ abducible(log(SI,_,T,sendTo(SJ,Id),_,info), D, D) :-
     { T>=0 , T=<Te }.
 
 
-abducible(log(SI,I,T,timeout(SJ,Id),_,err), D, D):- 
+abducible(log(SI,I,_,timeout(SJ,Id),_,err), D):- 
     once(
-        (log(SI,_,Te,sendTo(SJ,Id),_,info);
-        abducible(log(SI,_,Te,sendTo(SJ,Id),_,info),D, D))
+        (log(SI,_,_,sendTo(SJ,Id),_,info);
+        abducible(log(SI,_,_,sendTo(SJ,Id),_,info),D))
         ),
     checkDoubleFailure(log(SI,I,_,timeout(SJ,Id),_,err), D),
     dif(SI, SJ).
 
-abducible(log(SI,I,T,errorFrom(SJ,Id),_,err), D, D):- 
+abducible(log(SI,I,_,errorFrom(SJ,Id),_,err), D):- 
     once(
         (log(SI,_,_,sendTo(SJ,Id),_,info);
-        abducible(log(SI,_,_,sendTo(SJ,Id),_,info),D, D))
+        abducible(log(SI,_,_,sendTo(SJ,Id),_,info),D))
         ),
     checkDoubleFailure(log(SI,I,_,errorFrom(SJ,Id),_,err), D),
     dif(SI, SJ).
