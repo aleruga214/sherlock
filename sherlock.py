@@ -67,10 +67,9 @@ def main(argv):
     # *****************
     # * PRINT RESULTS *
     # *****************
-    solutions.sort()
 
     if verbose:
-        solutions.print()
+        solutions.print(templater)
     else:
         solutions.compactPrint(templater)
 

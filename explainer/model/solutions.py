@@ -84,16 +84,18 @@ class Solution:
         self.abductions = abductions     
 
     # function for printing the possible failure cascades (only considering service names)
-    def compactPrintSolution(self,i):
+    def compactPrintSolution(self,perc, min_abd):
         # print the explanation skeletons in "cascades"
-        print(f"[{i}]: " + self.explanation[0].compactEventString())
+        print(f"[min abductions: {min_abd}][{perc*100:.1f}%]: {self.explanation[0].compactEventString()}")
         for event in self.explanation[1:]:
             print(" -> " + event.compactEventString())
         print()
 
     # function for printing all explanations (verbose, with message)
-    def printSolution(self,i):
-        print(f"{i}: {self.explanation[0]}")
+    def printSolution(self,i, perc):
+        print(f"Solution {i} [{perc*100:.1f}%]")
+        print("-"*50)
+        print(f"▶ {self.explanation[0]}")
         for event in self.explanation[1:]:
             print(f" -> {event}")
         print() 
@@ -106,11 +108,6 @@ class Solution:
         print()
            
         print("-"*50)
-
-    def __lt__(self, other):
-        if len(self.abductions)==len(other.abductions): 
-            return len(self.explanation)<len(other.explanation)
-        return len(self.abductions)<len(other.abductions)
 
     @staticmethod
     def akinExplanation(exp1, exp2, templater):
@@ -166,9 +163,18 @@ class Solutions:
         for item in events_list:
             if str(item.name) == "boundedEvent":
                 event = item.args[0]
-                t_min = datetime.fromtimestamp(item.args[1]) if not isinstance(item.args[1],Atom) and not isinstance(item.args[1],Functor) else item.args[1]
-                t_max = datetime.fromtimestamp(item.args[2]) if not isinstance(item.args[2],Atom) and not isinstance(item.args[2],Functor)else item.args[2]
+                if not isinstance(item.args[1],Atom) and not isinstance(item.args[1],Functor):
+                    dt_min = datetime.fromtimestamp(item.args[1])
+                    t_min = dt_min.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                else:
+                    t_min = item.args[1]
 
+                if not isinstance(item.args[2],Atom) and not isinstance(item.args[2],Functor):
+                    dt_max = datetime.fromtimestamp(item.args[2])
+                    t_max = dt_max.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] 
+                else:
+                    t_max = item.args[2]
+            
             else:
                 event = item 
                 t_max = None
@@ -190,7 +196,8 @@ class Solutions:
                 instance = str(event.args[1])
                 t_val = event.args[2]
                 if not isinstance(t_val, Variable):
-                    timestamp = datetime.fromtimestamp(t_val) # timestamp saved as ISO
+                    dt = datetime.fromtimestamp(t_val) # timestamp saved as ISO
+                    timestamp = dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 message = str(event.args[4])
             elif not(type == EventType.UNREACHABLE.value or type == EventType.NEVER_STARTED.value) :
                 raise TypeError("unknown event type " + type) # to avoid missing events (if not corresponding to a known type)
@@ -242,11 +249,39 @@ class Solutions:
 
     def compactPrint(self, templater):
         groupedSolutions = self.groupSolutions(templater)
-        # print the explanation skeletons in "cascades"
-        for s in groupedSolutions:
-            percentage = round(len(s)/self.size(),3)
-            s[0].compactPrintSolution(percentage)
 
-    def print(self):
-        for i,s in enumerate(self.solutions, start=1):
-            s.printSolution(i)
+        groups = []
+
+        for group in groupedSolutions:
+            minAbductions = min(len(s.abductions) for s in group)
+            frequency = len(group)
+            chainLength = len(group[0].explanation)
+
+            groups.append((group, minAbductions, frequency, chainLength))
+
+        sortedGroups = sorted(groups, key=lambda g: (g[1], -g[2], g[3]))
+
+        for group, minAbductions, frequency, chainLength in sortedGroups:
+            percentage = round(frequency / self.size(), 3)
+            group[0].compactPrintSolution(percentage, minAbductions)
+
+
+    def print(self, templater):
+        groupedSolutions = self.groupSolutions(templater)
+        frequencies = {}
+
+        for group in groupedSolutions:
+            frequency = len(group)
+
+            for solution in group:
+                frequencies[id(solution)] = frequency
+
+        def individualSortKey(sol):
+            frequency = frequencies.get(id(sol), 1)
+            return (len(sol.abductions), -frequency, len(sol.explanation))
+            
+        sortedSolutions = sorted(self.solutions, key=individualSortKey)
+
+        for i,s in enumerate(sortedSolutions, start=1):
+            percentage = round(frequencies[id(s)] / self.size(), 3)
+            s.printSolution(i,percentage)
