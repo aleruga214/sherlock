@@ -95,7 +95,7 @@ class Solution:
     def printSolution(self,i):
         print(f"{i}: {self.explanation[0]}")
         for event in self.explanation[1:]:
-            print(" -> " + event)
+            print(f" -> {event}")
         print() 
 
         line = "Abductions:" if (len(self.abductions)!=0) else "No Abductions needed!"
