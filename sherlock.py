@@ -57,23 +57,24 @@ def main(argv):
     event = "event.pl"
     parseEvents(eventLogLine,event,templater)
     knowledgeBase = "knowledgeBase.pl"
-    parseEvents(applicationLogs,knowledgeBase,templater)
+    tMin, tMax = parseEvents(applicationLogs,knowledgeBase,templater)
     
     # ***********************
     # * ROOT CAUSE ANALYSIS *
     # ***********************
-    solutions = explain(event,knowledgeBase, nAbducibles, nSols, rootCause)
+    solutions = explain(event,knowledgeBase, nAbducibles, nSols, rootCause, tMin, tMax)
 
     # *****************
     # * PRINT RESULTS *
     # *****************
 
-    if verbose:
-        solutions.print(templater)
-    else:
-        solutions.compactPrint(templater)
+    if solutions and solutions.size() > 0:
+        if verbose:
+            solutions.print(templater)
+        else:
+            solutions.compactPrint(templater)
 
-    solutions.marshal(templater,"explanations.txt")
+        solutions.marshal(templater,"explanations.txt")
 
     if solutions.size()==0:
         rc = (" from " + rootCause) if rootCause!=None else "" 
@@ -84,7 +85,7 @@ def main(argv):
 
     # Remove generated files
     os.remove(event) # comment this, if needing to keep files for Prolog debugging
-    os.remove(knowledgeBase) # comment this, if needing to keep files for Prolog debugging
+    #os.remove(knowledgeBase) # comment this, if needing to keep files for Prolog debugging
 
 # function for printing cli erros, followed by cli usage
 def cli_error(message):

@@ -5,10 +5,17 @@ def parseEvents(applicationLogs,targetFile,templater):
     loggedEvents = open(applicationLogs,"r")
     knowledgeBase = open(targetFile,"w")
 
+    maxT = float("-inf")
+    minT = float("inf") 
     # parse logged events (reversed, to go from last logged event to first logged event)
     for le in reversed(list(loggedEvents)): 
         # parsing log event with chosen template
         event = templater.parse(le)
+
+        if event.timestamp > maxT:
+            maxT = event.timestamp
+        if event.timestamp < minT:
+            minT = event.timestamp    
 
         # Generate log facts only for events that are truly of interest 
         if event.message.type == MessageType.OTHER and event.severity in ["info","debug"]:
@@ -20,6 +27,8 @@ def parseEvents(applicationLogs,targetFile,templater):
     # close source/target files
     loggedEvents.close()
     knowledgeBase.close()
+
+    return (minT,maxT)
 
 # function for generating the Prolog representation of a log event
 # (it takes as input an "Event" -> see module "event.py")

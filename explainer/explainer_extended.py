@@ -1,7 +1,10 @@
 from pyswip import Prolog
 from explainer.model.solutions import Solutions
 
-def explain(event,applicationLogs, nAbducibles, nSols, rootCause):
+def explain(event,applicationLogs, nAbducibles, nSols, rootCause, tMin, tMax):
+
+    print("tempo minimo: ", tMin)
+    print("tempo massimo: ", tMax)
     # create Prolog reasoner
     reasoner = Prolog()
     
@@ -21,12 +24,13 @@ def explain(event,applicationLogs, nAbducibles, nSols, rootCause):
 
     goal = f"solveWithBounds({eventToExplain}, [], D, {nAbducibles}, N, Explanations,"
     goal += (rootCause) if rootCause is not None else "Root"
-    goal += ")"
+    goal += f", {tMin}, {tMax})"
 
     if nSols is not None:
         query = f"limit({nSols}, {goal})."
     else:
-        query = f"{goal}."    
+        query = f"limit(1000,{goal})."            #f"{goal}."    
 
     rootCauses = list(reasoner.query(query))
+
     return Solutions(rootCauses)

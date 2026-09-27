@@ -7,6 +7,14 @@ data/experiments/sock-echo/post-processing/post-processing.logs
 *.pdf
 data/examples/sock-echo/deploy/docker-compose-configured.yml
 data/examples/sock-echo/deploy/*.log
+output/*.log
+
+tester.py
+explainer/model/solutions_v2.py
+sherlock_test.py
+yrca_test.py
+explainer/model/explanations_test.py
+.vscode/
 
 # Temporary files
 event.pl

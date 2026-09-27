@@ -1,4 +1,4 @@
-solve({C}, D, D, N, N, H, H) :- %!,
+solve({C}, D, D, N, N, H, H) :- !,%
     call({C}).
 
 solve(true, D, D, N, N, H, H):- !. 
@@ -6,7 +6,7 @@ solve(true, D, D, N, N, H, H):- !.
 solve(\+A, D, D, N, N, H, H) :-
     \+solve(A, D, _, 0, _, H, _).
 
-solve((A;B), D, NewD, N, NewN, H, NewH) :- %!,
+solve((A;B), D, NewD, N, NewN, H, NewH) :- !,%
     (solve(A, D, NewD, N, NewN, H, NewH) ; solve(B, D, NewD, N, NewN, H, NewH)).
 
 solve(A, D, D, N, N, H, H) :-
@@ -14,7 +14,7 @@ solve(A, D, D, N, N, H, H) :-
     predicate_property(A, built_in), !,
     call(A).
 
-solve((A,B), D, NewD, N, NewN, H, NewH) :- %!,
+solve((A,B), D, NewD, N, NewN, H, NewH) :- !,%
     solve(A,D,Dtemp, N, Ntemp, H, Htemp), 
     solve(B,Dtemp,NewD, Ntemp, NewN, Htemp, NewH).
 
@@ -34,7 +34,7 @@ solve(A,D,[A|D], N, NewN, H, H) :-
     A \= (_,_), A \= (_;_), A \= {_}, A \= (\+_),
     \+ clause(A,_), 
     \+ member(A,D),
-    abducible(A, D),%!, 
+    abducible(A, D),!,% 
     NewN is N - 1.
 
 
@@ -44,5 +44,6 @@ checkHistory(A,H,[A|H]):-
 
 checkHistory(A, H, H) :- 
     A \= causedBy(_,_,_).
+
 
 

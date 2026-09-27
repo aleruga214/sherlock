@@ -9,7 +9,7 @@ abducible(log(SI,_,T,sendTo(SJ,Id),_,info), _) :-
         log(SI,_,Te,errorFrom(SJ,Id),_,err))
         ),
     dif(SI, SJ), 
-    { T>=0, T=<Te }.
+    { T=<Te }.
 
 abducible(log(SI,_,T,sendTo(SJ,Id),_,info), _) :-
     once(
@@ -18,58 +18,23 @@ abducible(log(SI,_,T,sendTo(SJ,Id),_,info), _) :-
         ),
     dif(Id, Id2),
     dif(SI, SJ), 
-    { T>=0 , T=<Te }.
+    { T=<Te }.
 
-
-abducible(log(SI,I,_,timeout(SJ,Id),_,err), D):- 
-    once(
-        (log(SI,_,_,sendTo(SJ,Id),_,info);
-        abducible(log(SI,_,_,sendTo(SJ,Id),_,info),D))
-        ),
-    checkDoubleFailure(log(SI,I,_,timeout(SJ,Id),_,err), D),
-    dif(SI, SJ).
-
-abducible(log(SI,I,_,errorFrom(SJ,Id),_,err), D):- 
-    once(
-        (log(SI,_,_,sendTo(SJ,Id),_,info);
-        abducible(log(SI,_,_,sendTo(SJ,Id),_,info),D))
-        ),
-    checkDoubleFailure(log(SI,I,_,errorFrom(SJ,Id),_,err), D),
-    dif(SI, SJ).
-
-/*
-abducible(log(SI,I,T,timeout(SJ,Id),_,err), D, D) :- 
-    once(
-        (log(SI,_,_,sendTo(SJ,Id),_,info); 
-        member(log(SI,_,_,sendTo(SJ,Id),_,info),D))
-        ), !, %member(log(SI,_,_,sendTo(SJ,Id),_,info),D)
-    checkDoubleFailure(log(SI,I,_,timeout(SJ,Id),_,err), D),
+abducible(log(SI,I,T,timeout(SJ,Id),_,err), D):- 
+    SendToLog = log(SI,_,Ts,sendTo(SJ,Id),_,info),
+    (SendToLog; 
+    (\+ SendToLog, abducible(SendToLog,D)) ),
+    checkDoubleFailure(log(SI,I,T,timeout(SJ,Id),_,err), D),
     dif(SI, SJ),
-    {T>=0}.
+    { T >= Ts}.
 
-abducible(log(SI,I,T,timeout(SJ,Id),_,err), D, [SendToLog | D]) :- 
-    SendToLog = log(SI,I,Te,sendTo(SJ,Id),_,info),
-    abducible(SendToLog, D, D),
-    checkDoubleFailure(log(SI,I,_,timeout(SJ,Id),_,err), D),
-    dif(SI, SJ),
-    {T>=0, T>=Te}.
-
-abducible(log(SI,I,T,errorFrom(SJ,Id),_,err), D, D) :- 
-    once(
-        (log(SI,_,_,sendTo(SJ,Id),_,info); 
-        member(log(SI,_,_,sendTo(SJ,Id),_,info),D))
-        ), !, %member(log(SI,_,_,sendTo(SJ,Id),_,info),D)
+abducible(log(SI,I,T,errorFrom(SJ,Id),_,err), D):- 
+    SendToLog = log(SI,_,Ts,sendTo(SJ,Id),_,info),
+    (SendToLog; 
+    (\+ SendToLog, abducible(SendToLog,D)) ),
     checkDoubleFailure(log(SI,I,_,errorFrom(SJ,Id),_,err), D),
     dif(SI, SJ),
-    {T>=0}.
-
-abducible(log(SI,I,T,errorFrom(SJ,Id),_,err), D, [SendToLog | D]) :- 
-    SendToLog = log(SI,I,Te,sendTo(SJ,Id),_,info),
-    abducible(SendToLog, D, D),
-    checkDoubleFailure(log(SI,I,_,errorFrom(SJ,Id),_,err), D),
-    dif(SI, SJ),
-    {T>=0, T>=Te}.
-*/
+    { T >= Ts}.
 
 
 checkDoubleFailure(log(SI,I,_,timeout(SJ,Id),_,err), D) :- 

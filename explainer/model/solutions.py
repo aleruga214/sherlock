@@ -43,7 +43,7 @@ class LogOperation:
     
 # class to represent an event
 class Event:
-    def __init__(self,serviceName,type,instance,timestamp,message, operation, t_min, t_max):
+    def __init__(self,serviceName,type,instance,timestamp,message, operation, t_min, t_max, severity):
         self.serviceName = serviceName
         self.type = type            # log, unreacheable, never started
         self.instance = instance
@@ -52,11 +52,21 @@ class Event:
         self.operation = operation  # object LogOperation
         self.t_min = t_min
         self.t_max = t_max 
+        self.severity = severity
 
     # function for printing a single event in an explanation (verbose, with message)
     def __str__(self):
         if self.type == EventType.LOG.value:
-            event = f"[{self.timestamp}] " if self.timestamp is not None else f"[T ∈ [{self.t_min}, {self.t_max}]] "
+            timestamp = datetime.fromtimestamp(self.timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] if self.timestamp else None
+            if not isinstance(self.t_min, str):
+                t_min = datetime.fromtimestamp(self.t_min).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]            
+            else:
+                t_min = self.t_min 
+            if not isinstance(self.t_max, str):
+                t_max = datetime.fromtimestamp(self.t_max).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] 
+            else:
+                t_max = self.t_max    
+            event = f"[{timestamp}] " if timestamp is not None else f"[T ∈ [{t_min}, {t_max}]] "
             instance = self.instance if not str(self.instance).startswith("_") else ""
             event += instance + " (" + self.serviceName + "): " + str(self.operation)
             return event
@@ -64,6 +74,8 @@ class Event:
             return self.serviceName + " never started"
         elif self.type == EventType.UNREACHABLE.value:
             return self.serviceName + " was unreachable" 
+
+         
 
     # function for printing a single event in an explanation (without message)
     def compactEventString(self):
@@ -93,6 +105,7 @@ class Solution:
 
     # function for printing all explanations (verbose, with message)
     def printSolution(self,i, perc):
+        print("-"*50)
         print(f"Solution {i} [{perc*100:.1f}%]")
         print("-"*50)
         print(f"▶ {self.explanation[0]}")
@@ -107,7 +120,6 @@ class Solution:
             print(f"{j}) {abduction}")
         print()
            
-        print("-"*50)
 
     @staticmethod
     def akinExplanation(exp1, exp2, templater):
@@ -126,14 +138,8 @@ class Solution:
                 if e1.type != EventType.LOG.value:
                     return True
                 else:
-                    msg1 = templater.parseMessage(e1.message)
-                    msg2 = templater.parseMessage(e2.message)               
-                    # msg1 = e1.operation.compact_str()
-                    # msg2 = e2.operation.compact_str()
-                    if msg1 == msg2:
-                        return True
-                    else:
-                        return False
+                    return (e1.operation.typeLog == e2.operation.typeLog 
+                            and e1.operation.dstService==e2.operation.dstService)  
             else:
                 return False
 
@@ -163,22 +169,15 @@ class Solutions:
         for item in events_list:
             if str(item.name) == "boundedEvent":
                 event = item.args[0]
-                if not isinstance(item.args[1],Atom) and not isinstance(item.args[1],Functor):
-                    dt_min = datetime.fromtimestamp(item.args[1])
-                    t_min = dt_min.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                else:
-                    t_min = item.args[1]
 
-                if not isinstance(item.args[2],Atom) and not isinstance(item.args[2],Functor):
-                    dt_max = datetime.fromtimestamp(item.args[2])
-                    t_max = dt_max.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] 
-                else:
-                    t_max = item.args[2]
-            
+                t_min = float(item.args[1])
+                
+                t_max = float(item.args[2])
+
             else:
                 event = item 
                 t_max = None
-                t_min = None
+                t_min = None   
 
             # post-processed event info
             serviceName = str(event.args[0])
@@ -187,6 +186,7 @@ class Solutions:
             timestamp = None
             message = None 
             type = str(event.name)
+            severity = None
             # case: event = "log(serviceName,instanceId,timestamp,_,_)"
             if type == EventType.LOG.value:
                 if isinstance(event.args[3],Atom):
@@ -196,36 +196,36 @@ class Solutions:
                 instance = str(event.args[1])
                 t_val = event.args[2]
                 if not isinstance(t_val, Variable):
-                    dt = datetime.fromtimestamp(t_val) # timestamp saved as ISO
-                    timestamp = dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                    timestamp = float(t_val)
                 message = str(event.args[4])
+                severity = str(event.args[5])
             elif not(type == EventType.UNREACHABLE.value or type == EventType.NEVER_STARTED.value) :
                 raise TypeError("unknown event type " + type) # to avoid missing events (if not corresponding to a known type)
-            ppList.append(Event(serviceName,type,instance,timestamp,message,operation, t_min, t_max))
+            ppList.append(Event(serviceName,type,instance,timestamp,message,operation, t_min, t_max, severity))
         return ppList          
 
     def groupSolutions(self, templater):
-            # create an array "groupedSolutions" of solution groups
-            # (solutions that have explanations with the same skeleton go in the same group)
-            if self.size() == 0:
-                return
-            
-            groupedSolutions = []
-            for sol in self.solutions:
-                if len(sol.explanation) > 0:
-                    expList = None
-                    if groupedSolutions != []:
-                        for cascade in groupedSolutions:
-                            if Solution.akinExplanation(sol.explanation,cascade[0].explanation, templater):
-                                expList = cascade
-                                break
-                    if expList:
-                        expList.append(sol)
-                    else:
-                        expList = []
-                        expList.append(sol)
-                        groupedSolutions.append(expList)
-            return groupedSolutions            
+        # create an array "groupedSolutions" of solution groups
+        # (solutions that have explanations with the same skeleton go in the same group)
+        if self.size() == 0:
+            return
+        
+        groupedSolutions = []
+        for sol in self.solutions:
+            if len(sol.explanation) > 0:
+                expList = None
+                if groupedSolutions != []:
+                    for cascade in groupedSolutions:
+                        if Solution.akinExplanation(sol.explanation,cascade[0].explanation, templater):
+                            expList = cascade
+                            break
+                if expList:
+                    expList.append(sol)
+                else:
+                    expList = []
+                    expList.append(sol)
+                    groupedSolutions.append(expList)
+        return groupedSolutions            
 
     # function for marshalling all explanations (verbose, with message)
     def marshal(self,templater,outputFile):

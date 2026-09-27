@@ -35,7 +35,8 @@ causedBy(log(SI,I,T,E,M,Sev),[X],SI) :-
 causedBy(log(SI,I,T,E,M,Sev),[X|Xs],Root) :-                        
     (E=errorFrom(SJ,Id);E=timeout(SJ,Id)),
     failedInteraction(Id,(SI,I),(SJ,J),Ts,Te),
-    log(SJ,J,U,internal,MJ,SevJ), lte(SevJ,warning), {Ts =< U, U =< Te}, 
+    {Ts =< U, U =< Te},
+    log(SJ,J,U,internal,MJ,SevJ), lte(SevJ,warning),  
     X=log(SI,I,T,E,M,Sev),
     causedBy(log(SJ,J,U,internal,MJ,SevJ),Xs,Root).
 
@@ -51,7 +52,9 @@ causedBy(log(SI,I,T,E,M,Sev),[X|Xs],Root) :-
 causedBy(log(SI,I,T,E,M,Sev),[X|Xs],Root) :-                        
     (E=errorFrom(SJ,Id);E=timeout(SJ,Id)),
     failedInteraction(Id,(SI,I),(SJ,J),TsIJ,TeIJ), 
-    failedInteraction(_,(SJ,J),(_,_),TsJK,TeJK), {TsIJ =< TsJK, TeJK =< TeIJ},
+    {TsIJ =< TsJK, TeJK =< TeIJ},
+    failedInteraction(IdK,(SJ,J),(SK,_),TsJK,TeJK), 
+    (F = timeout(SK,IdK) ; F = errorFrom(SK,IdK)),
     log(SJ,J,TeJK,F,MJ,SevJ), lte(SevJ,warning), 
     X=log(SI,I,T,E,M,Sev),
     causedBy(log(SJ,J,TeJK,F,MJ,SevJ),Xs,Root).
@@ -60,13 +63,14 @@ causedBy(log(SI,I,T,E,M,Sev),[X|Xs],Root) :-
 ** This case explains that a timeout event E at service instance SI                          |---------->|           |
 ** has been caused by a timeout event O at service SJ, which -- in turn --                   |           |---------->|
 ** has been caused by a timeout event O'related to an interaction of SJ with SK.             |           |           |                          
-** After identifying the failure cascade SK -> SJ -> SI, yRCA recurs on the                  |           O           |
+** After identifying the failure cascade SK -> SJ -> SI, yRCA recurs on the                  O           |           |
 ** timeout at SJ to explain it.                                                              |           |           |
-**                                                                                           O           |           |
+**                                                                                           |           O           |
 */    
 causedBy(log(SI,I,T,timeout(SJ,Id),M,Sev),[X|Xs],Root) :-          
-    timedOutInteraction(Id,(SI,I),(SJ,J),_,TeIJ), 
-    timedOutInteraction(_,(SJ,J),(SK,_),TsJK,TeJK), {TsJK =< TeIJ, TeIJ < TeJK}, 
+    timedOutInteraction(Id,(SI,I),(SJ,J),TsIJ,TeIJ), 
+    {TsIJ =< TsJK, TsJK =< TeIJ, TeIJ < TeJK},
+    timedOutInteraction(IdJK,(SJ,J),(SK,_),TsJK,TeJK),
     log(SJ,J,TeJK,timeout(SK,IdJK),MJ,SevJ),
     X=log(SI,I,T,timeout(SJ,Id),M,Sev),
     causedBy(log(SJ,J,TeJK,timeout(SK,IdJK),MJ,SevJ),Xs,Root).
@@ -82,8 +86,9 @@ causedBy(log(SI,I,T,timeout(SJ,Id),M,Sev),[X|Xs],Root) :-
 */   
 causedBy(log(SI,I,T,E,M,Sev),[X|Xs],Root) :-                        
     (E=errorFrom(SJ,Id);E=timeout(SJ,Id)),
-    failedInteraction(Id,(SI,I),(SJ,J),TsIJ,TeIJ), 
-    nonReceivedRequest(IdK,J,SK,TsJK,TeJK), {TsIJ =< TsJK, TsJK =< TeIJ},
+    failedInteraction(Id,(SI,I),(SJ,J),TsIJ,TeIJ),
+    {TsIJ =< TsJK, TsJK =< TeIJ}, 
+    nonReceivedRequest(IdK,J,SK,TsJK,TeJK), 
     log(SJ,J,TeJK,timeout(SK,IdK),MJ,SevJ),
     X=log(SI,I,T,E,M,Sev),
     causedBy(log(SJ,J,TeJK,timeout(SK,IdK),MJ,SevJ),Xs,Root).
